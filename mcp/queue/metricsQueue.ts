@@ -1,6 +1,5 @@
-import { Queue } from 'bullmq';
+import { inngest } from '@/lib/inngest';
 import { appConfig } from '@lib/config';
-import { getBullConnectionOptions } from '@mcp/redis';
 
 export interface MetricsRefreshJobPayload {
   accountKey: string;
@@ -8,48 +7,32 @@ export interface MetricsRefreshJobPayload {
   delayMs?: number;
 }
 
-let metricsQueue: Queue<MetricsRefreshJobPayload> | null = null;
-
-export function getMetricsQueue() {
-  if (!metricsQueue) {
-    metricsQueue = new Queue<MetricsRefreshJobPayload>(appConfig.metricsQueueName, {
-      connection: getBullConnectionOptions(),
-      defaultJobOptions: {
-        attempts: 3,
-        backoff: {
-          type: 'exponential',
-          delay: 1000,
-        },
-        removeOnComplete: true,
-      },
-    });
-  }
-  return metricsQueue;
-}
-
+/**
+ * Enqueues a metrics refresh event via Inngest.
+ */
 export async function enqueueMetricsRefresh(accountKey: string, payload: { reason: string; delayMs?: number }) {
-  const queue = getMetricsQueue();
-  await queue.add(
-    `${accountKey}:${payload.reason}`,
-    { accountKey, reason: payload.reason, delayMs: payload.delayMs },
-    { delay: payload.delayMs }
-  );
-}
-
-export async function scheduleRecurringMetricsRefresh(accountKey: string) {
-  const queue = getMetricsQueue();
-  await queue.upsertJobScheduler(
-    `recurring-refresh:${accountKey}`,
-    {
-      every: appConfig.accountMetricsTtlMs,
+  await inngest.send({
+    name: "app/metrics.refresh",
+    data: {
+      accountKey,
+      reason: payload.reason,
     },
-    {
-      name: `refresh:${accountKey}`,
-      data: { accountKey, reason: 'recurring' },
-    }
-  );
+    // Inngest handles delays automatically if specified, or we can use step.sleep in the function
+  });
 }
 
+/**
+ * Schedules a recurring refresh event. 
+ * In Vercel environment, we use Inngest's cron-based scheduling or simply trigger on demand.
+ */
+export async function scheduleRecurringMetricsRefresh(accountKey: string) {
+  // Trigger an initial refresh
+  await enqueueMetricsRefresh(accountKey, { reason: 'initial-setup' });
+}
+
+/**
+ * Bootstraps refresh for all accounts.
+ */
 export async function bootstrapMetricsSchedulers(accounts: { username: string }[]) {
   for (const account of accounts) {
     await scheduleRecurringMetricsRefresh(account.username);

@@ -1,7 +1,6 @@
-import type { Server as SocketIOServer } from 'socket.io';
+import Pusher from 'pusher';
 import type { AccountMetrics } from '@lib/types';
 import { appConfig } from '@lib/config';
-import { createRedisConnection, getRedisClient } from '@mcp/redis';
 
 export interface MetricsUpdateMessage {
   reason: string;
@@ -11,8 +10,19 @@ export interface MetricsUpdateMessage {
 }
 
 export class RealtimeUpdateService {
-  private get publisher() {
-    return getRedisClient();
+  private pusher: Pusher | null = null;
+
+  private getPusher() {
+    if (!this.pusher && appConfig.pusher.appId) {
+      this.pusher = new Pusher({
+        appId: appConfig.pusher.appId,
+        key: appConfig.pusher.key,
+        secret: appConfig.pusher.secret,
+        cluster: appConfig.pusher.cluster,
+        useTLS: true,
+      });
+    }
+    return this.pusher;
   }
 
   async publishMetricsUpdate(metrics: AccountMetrics, reason: string): Promise<void> {
@@ -23,29 +33,17 @@ export class RealtimeUpdateService {
       updatedAt: new Date().toISOString(),
     };
 
-    await this.publisher.publish(appConfig.realtimeChannel, JSON.stringify(payload));
+    const pusher = this.getPusher();
+    if (pusher) {
+      await pusher.trigger(appConfig.realtimeChannel, payload.type, payload);
+    } else {
+      console.warn('Pusher not configured, real-time update skipped.');
+    }
   }
 
-  async bridgeSocketServer(io: SocketIOServer): Promise<() => Promise<void>> {
-    const subscriber = createRedisConnection();
-    await subscriber.subscribe(appConfig.realtimeChannel);
-
-    const handleMessage = (channel: string, rawMessage: string) => {
-      if (channel !== appConfig.realtimeChannel) {
-        return;
-      }
-
-      const payload = JSON.parse(rawMessage) as MetricsUpdateMessage;
-      io.emit(payload.type, payload);
-    };
-
-    subscriber.on('message', handleMessage);
-
-    return async () => {
-      subscriber.off('message', handleMessage);
-      await subscriber.unsubscribe(appConfig.realtimeChannel);
-      await subscriber.quit();
-    };
+  // legacy bridge for socket.io - keeping signature but making it a no-op for serverless
+  async bridgeSocketServer(_io: any): Promise<() => Promise<void>> {
+    return async () => {};
   }
 }
 

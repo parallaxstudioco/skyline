@@ -1,6 +1,7 @@
 export const appConfig = {
   port: parseInt(process.env.PORT || '3000', 10),
   redis: {
+    url: process.env.REDIS_URL || undefined,
     host: process.env.REDIS_HOST || 'localhost',
     port: parseInt(process.env.REDIS_PORT || '6379', 10),
     password: process.env.REDIS_PASSWORD || undefined,
@@ -9,6 +10,13 @@ export const appConfig = {
   instagramAppSecret: process.env.INSTAGRAM_APP_SECRET || '',
   instagramAccessToken: process.env.IG_ACCESS_TOKEN || '',
   instagramRedirectUri: process.env.INSTAGRAM_REDIRECT_URI || 'http://localhost:3000/api/auth/instagram/callback',
+  pusher: {
+    appId: process.env.PUSHER_APP_ID || '',
+    key: process.env.PUSHER_KEY || '',
+    secret: process.env.PUSHER_SECRET || '',
+    cluster: process.env.PUSHER_CLUSTER || 'mt1',
+  },
+  inngestKey: process.env.INNGEST_EVENT_KEY || '',
   metricsQueueName: 'instagram-metrics-refresh',
   accountMetricsTtlMs: 5 * 60 * 1000, // 5 minutes
   postMetricsTtlMs: 2 * 60 * 1000,    // 2 minutes

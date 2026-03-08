@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
-import { io } from 'socket.io-client';
+import Pusher from 'pusher-js';
 import { CityScene } from '@frontend/CityScene';
 import { Tooltip } from '@frontend/Tooltip';
 import { PostPanel } from '@frontend/PostPanel';
@@ -158,9 +158,16 @@ export default function Home() {
   }, []);
 
   useEffect(() => {
-    const socket = io({
-      path: '/socket.io',
+    if (!process.env.NEXT_PUBLIC_PUSHER_KEY) {
+      console.warn('Pusher key missing, real-time updates disabled.');
+      return;
+    }
+
+    const pusher = new Pusher(process.env.NEXT_PUBLIC_PUSHER_KEY, {
+      cluster: process.env.NEXT_PUBLIC_PUSHER_CLUSTER || 'mt1',
     });
+
+    const channel = pusher.subscribe('social-skyline-updates');
 
     const handleMetricsUpdate = (payload: MetricsUpdatePayload) => {
       setAccounts((currentAccounts) => {
@@ -212,11 +219,12 @@ export default function Home() {
       });
     };
 
-    socket.on('metrics:update', handleMetricsUpdate);
+    channel.bind('metrics:update', handleMetricsUpdate);
 
     return () => {
-      socket.off('metrics:update', handleMetricsUpdate);
-      socket.disconnect();
+      channel.unbind_all();
+      channel.unsubscribe();
+      pusher.disconnect();
     };
   }, []);
 

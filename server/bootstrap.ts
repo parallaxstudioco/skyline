@@ -1,18 +1,15 @@
 import { getRedisClient } from '@mcp/redis';
-import { getMetricsQueue } from '@mcp/queue/metricsQueue';
 
 export async function bootstrapBackendServices() {
   try {
-    // Ensure Redis is connected
+    // Ensure Redis is connected (essential for account storage)
     const redis = getRedisClient();
     await redis.ping();
     
-    // Ensure Queues are initialized
-    getMetricsQueue();
-    
-    console.log('Backend services bootstrapped successfully.');
+    console.log('Backend services bootstrapped successfully (Redis connected).');
   } catch (error) {
     console.error('Failed to bootstrap backend services:', error);
-    throw error;
+    // In serverless, we might not want to throw and crash the entire process
+    // but individual functions will handle their own connectivity
   }
 }
