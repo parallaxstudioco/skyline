@@ -311,7 +311,7 @@ export default function Home() {
       ) : (
         <>
           <CityScene
-            accounts={accounts}
+            accounts={accounts.filter(a => !a.isPending)}
             pulsingAccounts={pulsingAccounts}
             onHover={setHoveredAccount}
             onFloorClick={handleFloorClick}

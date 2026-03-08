@@ -301,29 +301,21 @@ function buildPostData(mediaEdge: unknown, index: number): PostData {
 export class InstagramMetricsService {
   async listAccountMetrics(): Promise<MetricsListResult> {
     const connectedAccounts = await connectedAccountsStore.list();
-    const results: Array<
-      | {
-          type: 'metrics';
-          metrics: AccountMetrics;
-        }
-      | {
-          type: 'warning';
-          warning: string;
-        }
-    > = [];
 
-    for (const account of connectedAccounts) {
-      try {
-        const metrics = await this.getAccountMetrics(account.username);
-        results.push({ type: 'metrics', metrics });
-      } catch (error) {
-        const message = error instanceof Error ? error.message : 'Unknown error';
-        results.push({
-          type: 'warning',
-          warning: `Skipped @${account.username}. ${message}`,
-        });
-      }
-    }
+    const results = await Promise.all(
+      connectedAccounts.map(async (account) => {
+        try {
+          const metrics = await this.getAccountMetrics(account.username);
+          return { type: 'metrics' as const, metrics };
+        } catch (error) {
+          const message = error instanceof Error ? error.message : 'Unknown error';
+          return {
+            type: 'warning' as const,
+            warning: `Skipped @${account.username}. ${message}`,
+          };
+        }
+      })
+    );
 
     return {
       accounts: results

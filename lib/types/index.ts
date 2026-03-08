@@ -49,9 +49,10 @@ export interface AccountMetrics {
     comments: number;
     shares: number;
     saves: number;
-    views: number;
+    views: number | null; // Changed from number to number | null
   };
   postsData: PostData[]; // Per-post data, one entry per floor
+  isPending?: boolean; // Optional flag for background loading state
 }
 
 export interface SessionLocation {

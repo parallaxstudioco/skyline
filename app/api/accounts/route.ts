@@ -39,23 +39,35 @@ export async function POST(request: Request) {
     });
     await scheduleRecurringMetricsRefresh(normalizedUsername);
 
-    try {
-      const account = await instagramMetricsService.getAccountMetrics(normalizedUsername);
+    // Instead of waiting for the full fetch (which takes seconds), return a "pending" account immediately.
+    // The background job triggered by scheduleRecurringMetricsRefresh will push the full data via Pusher.
+    const pendingAccount: any = {
+      accountKey: normalizedUsername,
+      username: normalizedUsername,
+      followers: 0,
+      following: 0,
+      posts: 0,
+      avgLikes: 0,
+      cachedAt: new Date().toISOString(),
+      engagementSummary: {
+        sampledPosts: 0,
+        likes: 0,
+        comments: 0,
+        shares: 0,
+        saves: 0,
+        views: 0,
+      },
+      postsData: [],
+      isPending: true,
+    };
 
-      return NextResponse.json(
-        {
-          account,
-          saved: true,
-        },
-        { status: existingAccount ? 200 : 201 }
-      );
-    } catch (error) {
-      if (!existingAccount) {
-        await connectedAccountsStore.remove(normalizedUsername).catch(() => undefined);
-      }
-
-      throw error;
-    }
+    return NextResponse.json(
+      {
+        account: pendingAccount,
+        saved: true,
+      },
+      { status: existingAccount ? 200 : 201 }
+    );
   } catch (error) {
     console.error('Error in accounts POST route:', error);
     const status =
