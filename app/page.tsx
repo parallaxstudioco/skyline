@@ -103,9 +103,14 @@ export default function Home() {
   }, []);
 
   useEffect(() => {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 8000); // 8 second timeout
+
     async function fetchAccounts() {
       try {
-        const response = await fetch('/api/accounts');
+        const response = await fetch('/api/accounts', { signal: controller.signal });
+        clearTimeout(timeoutId);
+
         if (!response.ok) {
           throw new Error('Failed to fetch data');
         }
@@ -127,13 +132,17 @@ export default function Home() {
         throw new Error('Unexpected accounts response');
       } catch (error) {
         console.error('Error fetching accounts:', error);
-        setLoadWarning('Some accounts could not be loaded with verified Instagram metrics.');
+        setLoadWarning('Connection error: Could not reach the digital metropolis.');
       } finally {
         setLoading(false);
       }
     }
 
     fetchAccounts();
+    return () => {
+      controller.abort();
+      clearTimeout(timeoutId);
+    };
   }, []);
 
   useEffect(() => {
